@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GEP Terminbestätigung erstellen</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;color:#222;margin:0;padding:24px}
+  .wrap{max-width:850px;margin:auto;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.08);overflow:hidden}
+  .head{border-left:8px solid #ef6c00;padding:24px 28px;background:#fff}
+  h1{margin:0 0 6px;font-size:27px}
+  .sub{color:#666}
+  .content{padding:26px 28px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  label{display:block;font-weight:700;font-size:14px;margin-bottom:6px}
+  input,textarea,select{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #ccc;border-radius:8px;font-size:15px}
+  textarea{min-height:90px;resize:vertical}
+  .full{grid-column:1/-1}
+  .buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+  button{border:0;border-radius:8px;padding:12px 16px;font-weight:700;cursor:pointer;font-size:14px}
+  .primary{background:#ef6c00;color:#fff}
+  .secondary{background:#333;color:#fff}
+  .light{background:#eee;color:#222}
+  .output{margin-top:25px;border-top:1px solid #ddd;padding-top:22px}
+  .box{background:#fafafa;border:1px solid #ddd;border-radius:10px;padding:14px;margin:10px 0 20px;white-space:pre-wrap;line-height:1.5}
+  .note{font-size:13px;color:#666;margin-top:18px}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}.full{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>GEP Terminbestätigung</h1>
+    <div class="sub">Kalendereinladung, WhatsApp-Text und E-Mail in wenigen Sekunden erstellen</div>
+  </div>
+
+  <div class="content">
+    <div class="grid">
+      <div>
+        <label for="kunde">Name des Kunden</label>
+        <input id="kunde" placeholder="z. B. Herr Müller">
+      </div>
+      <div>
+        <label for="email">E-Mail des Kunden (optional)</label>
+        <input id="email" type="email" placeholder="kunde@example.de">
+      </div>
+      <div>
+        <label for="datum">Datum</label>
+        <input id="datum" type="date">
+      </div>
+      <div>
+        <label for="zeit">Uhrzeit</label>
+        <input id="zeit" type="time" value="10:00">
+      </div>
+      <div>
+        <label for="dauer">Dauer</label>
+        <select id="dauer">
+          <option value="60">60 Minuten</option>
+          <option value="90" selected>90 Minuten</option>
+          <option value="120">120 Minuten</option>
+        </select>
+      </div>
+      <div>
+        <label for="titel">Terminbezeichnung</label>
+        <input id="titel" value="Vor-Ort-Beratung Wärmepumpe – GEP">
+      </div>
+      <div class="full">
+        <label for="adresse">Adresse des Termins</label>
+        <input id="adresse" placeholder="Straße, Hausnummer, PLZ Ort">
+      </div>
+      <div class="full">
+        <label for="zusatz">Zusätzliche Hinweise</label>
+        <textarea id="zusatz">Bitte halten Sie – wenn möglich – Ihre letzte Heizkostenabrechnung sowie vorhandene Unterlagen zur Heizung bereit. Falls ein Partner, Miteigentümer oder weiterer Mitentscheider beteiligt ist, wäre es ideal, wenn diese Person ebenfalls am Termin teilnimmt.</textarea>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" onclick="downloadICS()">Kalenderdatei (.ics) herunterladen</button>
+      <button class="secondary" onclick="generateTexts()">Texte erstellen</button>
+      <button class="light" onclick="copyText('whatsapp')">WhatsApp-Text kopieren</button>
+      <button class="light" onclick="copyText('mail')">E-Mail-Text kopieren</button>
+    </div>
+
+    <div class="output">
+      <h3>WhatsApp-Terminbestätigung</h3>
+      <div class="box" id="whatsapp">Bitte zuerst „Texte erstellen“ anklicken.</div>
+
+      <h3>E-Mail-Terminbestätigung</h3>
+      <div class="box" id="mail">Bitte zuerst „Texte erstellen“ anklicken.</div>
+    </div>
+
+    <div class="note">
+      Die heruntergeladene .ics-Datei kannst du per E-Mail oder WhatsApp versenden. Der Kunde kann sie auf iPhone, Android, Outlook und Google Kalender öffnen und speichern.
+    </div>
+  </div>
+</div>
+
+<script>
+function pad(n){return String(n).padStart(2,'0')}
+function escapeICS(s){
+  return (s || '').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');
+}
+function localToICS(date,time,addMinutes){
+  const [y,m,d]=date.split('-').map(Number);
+  const [hh,mm]=time.split(':').map(Number);
+  const dt=new Date(y,m-1,d,hh,mm,0);
+  dt.setMinutes(dt.getMinutes()+addMinutes);
+  return dt.getFullYear()+pad(dt.getMonth()+1)+pad(dt.getDate())+'T'+pad(dt.getHours())+pad(dt.getMinutes())+'00';
+}
+function formatDateDE(date){
+  const [y,m,d]=date.split('-');
+  return `${d}.${m}.${y}`;
+}
+function getData(){
+  return {
+    kunde:document.getElementById('kunde').value.trim() || 'Frau/Herr [Name]',
+    email:document.getElementById('email').value.trim(),
+    datum:document.getElementById('datum').value,
+    zeit:document.getElementById('zeit').value,
+    dauer:parseInt(document.getElementById('dauer').value,10),
+    titel:document.getElementById('titel').value.trim(),
+    adresse:document.getElementById('adresse').value.trim(),
+    zusatz:document.getElementById('zusatz').value.trim()
+  };
+}
+function validate(d){
+  if(!d.datum || !d.zeit || !d.adresse){
+    alert('Bitte Datum, Uhrzeit und Adresse eintragen.');
+    return false;
+  }
+  return true;
+}
+function downloadICS(){
+  const d=getData();
+  if(!validate(d)) return;
+  const start=localToICS(d.datum,d.zeit,0);
+  const end=localToICS(d.datum,d.zeit,d.dauer);
+  const now=new Date();
+  const stamp=now.getUTCFullYear()+pad(now.getUTCMonth()+1)+pad(now.getUTCDate())+'T'+pad(now.getUTCHours())+pad(now.getUTCMinutes())+pad(now.getUTCSeconds())+'Z';
+  const uid='gep-'+Date.now()+'@german-energy-power.de';
+  const description=`Persönliche Vor-Ort-Beratung zur Wärmepumpe mit Heike Seiler, Fachberaterin Niederrhein.\\n\\n${d.zusatz}\\n\\nKontakt:\\nMobil: +49 1511 1111616\\nE-Mail: heike.seiler@german-energy-power.de\\nWeb: www.german-energy-power.de`;
+  const ics=[
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//German Energy Power GmbH//Terminbestätigung//DE',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    'UID:'+uid,
+    'DTSTAMP:'+stamp,
+    'DTSTART:'+start,
+    'DTEND:'+end,
+    'SUMMARY:'+escapeICS(d.titel),
+    'LOCATION:'+escapeICS(d.adresse),
+    'DESCRIPTION:'+escapeICS(description),
+    'ORGANIZER;CN=Heike Seiler:mailto:heike.seiler@german-energy-power.de',
+    'STATUS:CONFIRMED',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT24H',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Erinnerung an Ihren GEP Beratungstermin',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+  const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const safe=d.kunde.replace(/[^a-zA-Z0-9äöüÄÖÜß-]+/g,'_');
+  a.download=`GEP_Termin_${safe}_${d.datum}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function generateTexts(){
+  const d=getData();
+  if(!validate(d)) return;
+  const date=formatDateDE(d.datum);
+  const wa=`Hallo ${d.kunde},\n\nhiermit bestätige ich unseren persönlichen Vor-Ort-Termin:\n\n📅 ${date}\n🕒 ${d.zeit} Uhr\n📍 ${d.adresse}\n⏱️ Geplante Dauer: ca. ${d.dauer} Minuten\n\n${d.zusatz}\n\nDie beigefügte Kalenderdatei können Sie mit einem Klick in Ihrem Kalender speichern.\n\nSollte sich kurzfristig etwas ändern, geben Sie mir bitte kurz Bescheid.\n\nIch freue mich auf unser persönliches Kennenlernen.\n\nViele Grüße\nHeike Seiler\nFachberaterin Niederrhein\nGEP German Energy Power GmbH\nMobil: +49 1511 1111616`;
+  const mail=`Betreff: Terminbestätigung – Vor-Ort-Beratung Wärmepumpe\n\nHallo ${d.kunde},\n\nvielen Dank für das angenehme Gespräch.\n\nHiermit bestätige ich unseren persönlichen Vor-Ort-Termin:\n\nDatum: ${date}\nUhrzeit: ${d.zeit} Uhr\nAdresse: ${d.adresse}\nGeplante Dauer: ca. ${d.dauer} Minuten\n\n${d.zusatz}\n\nIm Anhang finden Sie eine Kalenderdatei. Diese können Sie mit einem Klick in Ihrem Kalender speichern.\n\nSollte sich kurzfristig etwas ändern, geben Sie mir bitte kurz Bescheid.\n\nIch freue mich auf unser persönliches Kennenlernen.\n\nHerzliche Grüße\n\nHeike Seiler\nFachberaterin Niederrhein\nGEP German Energy Power GmbH\nMobil: +49 1511 1111616\nE-Mail: heike.seiler@german-energy-power.de\nWeb: www.german-energy-power.de`;
+  document.getElementById('whatsapp').textContent=wa;
+  document.getElementById('mail').textContent=mail;
+}
+async function copyText(id){
+  const text=document.getElementById(id).textContent;
+  if(text.startsWith('Bitte zuerst')){
+    alert('Bitte zuerst „Texte erstellen“ anklicken.');
+    return;
+  }
+
+  // Moderner Weg (funktioniert in vielen Browsern)
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+      alert('Text wurde kopiert.');
+      return;
+    }
+  }catch(e){
+    // Fallback wird unten versucht
+  }
+
+  // Fallback für iPad/iOS und Browser, die Clipboard API blockieren
+  const ta=document.createElement('textarea');
+  ta.value=text;
+  ta.setAttribute('readonly','');
+  ta.style.position='fixed';
+  ta.style.left='-9999px';
+  ta.style.top='0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+
+  let ok=false;
+  try{
+    ok=document.execCommand('copy');
+  }catch(e){}
+
+  document.body.removeChild(ta);
+
+  if(ok){
+    alert('Text wurde kopiert.');
+  }else{
+    alert('Automatisches Kopieren wurde vom Browser blockiert. Bitte den Text unten markieren und manuell kopieren.');
+  }
+}
+</script>
+</body>
+</html>
